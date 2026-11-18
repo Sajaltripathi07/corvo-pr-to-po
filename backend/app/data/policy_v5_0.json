@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "policy_code": "CORVO-PROC-POL-04",
+  "title": "Corvo Engineering Procurement Policy (PR to PO)",
+  "version": "5.0",
+  "effective_from": "2026-04-01",
+  "params": {
+    "recent_purchase_days": 365,
+    "po_price_lookback_days": 365,
+    "supplier_statuses_allowed": ["Active"]
+  },
+  "matching": {
+    "aliases": {"brg": "bearing", "pneu": "pneumatic", "hyd": "hydraulic", "rod": "electrode"},
+    "noise_phrases": ["as per sample", "for maintenance", "urgent", "asap", "repeat", "please", "pls"]
+  },
+  "clubbing": {
+    "enabled": true,
+    "same_fields": ["item_code", "plant"],
+    "created_within_days": 14,
+    "need_by_within_days": 7,
+    "never_club_new_items": true
+  },
+  "contracts": {
+    "supplier_statuses_allowed": ["Active"],
+    "check_ceiling": true
+  },
+  "preferred_list": {
+    "po_window_days": 548,
+    "include_contract_holders": true,
+    "min_on_time_pct": 0,
+    "min_quality": 0,
+    "weights": {"frequency": 0.30, "recency": 0.25, "contract": 0.15, "on_time": 0.15, "quality": 0.15},
+    "recency_tiers": [{"within_days": 90, "score": 1.0}, {"within_days": 365, "score": 0.5}],
+    "recency_default": 0.0
+  },
+  "suggestions": {
+    "topup_from_category": true,
+    "topup_weights": {"on_time": 0.5, "quality": 0.5}
+  },
+  "consolidation": {
+    "enabled": true,
+    "window_hours": 24,
+    "match_on": ["supplier_id", "plant", "route"]
+  },
+  "rules": [
+    {
+      "id": "1.2", "clause": "1.2", "name": "New item",
+      "when": {"all": [{"fact": "is_new_item", "op": "==", "value": true}]},
+      "then": {"decision": "SOURCING_REQUEST", "route": "NEW_ITEM_SOURCING", "supplier": {"mode": "none"}}
+    },
+    {
+      "id": "5.1", "clause": "5.1", "name": "Capex",
+      "when": {"all": [{"fact": "item_type", "op": "==", "value": "Capex"}]},
+      "then": {"decision": "SOURCING_REQUEST", "route": "CAPEX_SOURCING", "supplier": {"mode": "suggest", "count": 5}, "note": "Needs capex approval"}
+    },
+    {
+      "id": "5.2", "clause": "5.2", "name": "Rate contract",
+      "when": {"all": [{"fact": "contract_usable", "op": "==", "value": true}]},
+      "then": {"decision": "PO", "route": "CONTRACT_PO", "supplier": {"mode": "contract"}}
+    },
+    {
+      "id": "5.3", "clause": "5.3", "name": "Emergency PO",
+      "when": {"all": [
+        {"fact": "is_emergency", "op": "==", "value": true},
+        {"fact": "value_inr", "op": "<=", "value": 500000},
+        {"fact": "bought_recently_active", "op": "==", "value": true}]},
+      "then": {"decision": "PO", "route": "EMERGENCY_PO", "supplier": {"mode": "preferred", "rank": 1}}
+    },
+    {
+      "id": "5.4", "clause": "5.4", "name": "Spot PO",
+      "when": {"all": [
+        {"fact": "value_inr", "op": "<", "value": 200000},
+        {"fact": "bought_recently_active", "op": "==", "value": true}]},
+      "then": {"decision": "PO", "route": "SPOT_PO", "supplier": {"mode": "preferred", "rank": 1}}
+    },
+    {
+      "id": "5.5", "clause": "5.5", "name": "RFQ",
+      "when": {"all": [{"fact": "value_inr", "op": "<", "value": 1000000}]},
+      "then": {"decision": "SOURCING_REQUEST", "route": "RFQ", "supplier": {"mode": "suggest", "count": 3}}
+    },
+    {
+      "id": "5.6", "clause": "5.6", "name": "RFP",
+      "when": {},
+      "then": {"decision": "SOURCING_REQUEST", "route": "RFP", "supplier": {"mode": "suggest", "count": 5}}
+    }
+  ]
+}

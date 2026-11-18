@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+backend/data/*.db*
+# Task data must never be committed (brief requirement)
+Cantill_FullStack_Task_Kit*
+*.zip
+master_data/
+contracts/
+pr_batches/
+backend/data/*.csv
+node_modules/
