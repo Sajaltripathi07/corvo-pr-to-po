@@ -189,18 +189,19 @@ async function pPolicy() {
   <div class="grid2"><div>
   <div class="card"><h2>Propose a change</h2>${can ? "" : `<p class="no">Switch role to “Procurement head” to propose or approve policy changes.</p>`}
   <label>Policy or amendment document (PDF, DOCX, text, or JSON)</label><input type="file" id="pf" accept=".pdf,.docx,.txt,.md,.json">
-  <label>…or describe the change</label><textarea id="pi" placeholder="e.g. From 1 Dec 2026 raise the spot PO limit to ₹3,00,000 and the emergency limit to ₹7,50,000."></textarea>
+  <label>…or describe the change <small>(if you fill both, both are read together)</small></label><textarea id="pi" placeholder="e.g. From 1 Dec 2026 raise the spot PO limit to ₹3,00,000 and the emergency limit to ₹7,50,000."></textarea>
   <p class="sub">${STATUS.llm ? "AI reading is on (" + esc(STATUS.model) + ")." : "AI reading is off: the built-in reader handles limits, windows and dates; you can add other rules in the editor."}</p>
   <button class="primary" id="pr" ${can ? "" : "disabled"}>Read and preview changes</button></div><div id="draft"></div></div>
   <div class="card"><h2>Versions</h2>${ps.map(p => `<div style="margin-bottom:12px"><b>v${esc(p.version)}</b> ${p.status === "approved" ? (p === active ? '<span class="tag po">active</span>' : '<span class="tag mute">approved</span>') : `<span class="tag ${p.status === "draft" ? "info" : "bad"}">${p.status}</span>`}<br><small>effective ${esc(p.effective_from)} · ${esc(p.source_name || "")}${p.approved_by ? " · approved by " + esc(p.approved_by) + " " + esc(p.approved_at) : ""}</small>${p.status === "draft" ? ` <a href="#" data-d="${p.id}">open draft</a>` : ""}</div>`).join("")}</div></div>
   <div class="card"><h2>Rules in the active version (v${esc(active.version)}), applied in this order</h2><ol>${active.rules_text.map(t => `<li>${esc(t)}</li>`).join("")}</ol></div>`;
   view.querySelectorAll("[data-d]").forEach(a => a.onclick = guard(async e => { e.preventDefault(); draft(await api("/policies/" + a.dataset.d)); }));
   $("#pr").onclick = guard(async () => { const fd = new FormData(); const f = $("#pf").files[0]; if (f) fd.append("file", f); fd.append("instruction", $("#pi").value);
-    $("#pr").disabled = true; try { draft(await api("/policies/propose", { method: "POST", body: fd })); } finally { $("#pr").disabled = !can; } });
+    $("#pr").disabled = true; try { draft(await api("/policies/propose", { method: "POST", body: fd })); $("#pf").value = ""; } finally { $("#pr").disabled = !can; } });
   async function draft(p) {
     const imp = await api(`/policies/${p.id}/impact`).catch(() => ({ available: false })); const sch = await api("/policy-schema");
     $("#draft").innerHTML = `<div class="card"><h2>Draft v${esc(p.version)} · effective ${esc(p.effective_from)}</h2>
     <p class="sub">Read by: ${esc(p.source_kind)}</p>
+    ${p.effective_from <= active.effective_from ? `<p class="no"><b>Check the effective date.</b> It is on or before the active version's date (${esc(active.effective_from)}), so this draft would override the active policy for all existing requirements. Is this an amendment or a full policy?</p>` : ""}
     <h3>What will change</h3>${p.changes.length ? `<ul class="diff">${p.changes.map(c => `<li class="${c.type}">${esc(c.text)}</li>`).join("")}</ul>` : `<p class="no">No change detected. Use the editor below to add or edit rules.</p>`}
     ${p.notes.filter(Boolean).length ? `<h3>Notes</h3><ul>${p.notes.filter(Boolean).map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
     ${imp.available ? `<h3>Impact on the last batch (run #${imp.run_id})</h3><p>${imp.changed} of ${imp.lines} lines would be decided differently.</p>${imp.examples.length ? `<div class="scroll"><table><tr><th>PR</th><th>Was</th><th>Becomes</th></tr>${imp.examples.map(x => `<tr><td>${esc(x.pr)}</td><td>${esc(x.from)} ${esc(x.supplier_from || "")}</td><td>${esc(x.to)} ${esc(x.supplier_to || "")}</td></tr>`).join("")}</table></div>` : ""}` : ""}
@@ -214,6 +215,7 @@ async function pPolicy() {
     $("#ap").onclick = guard(async () => { const r = await api(`/policies/${p.id}/approve`, { method: "POST" }); toast(`v${r.version} approved, effective ${r.effective_from}`); pPolicy(); });
     $("#rj").onclick = guard(async () => { await api(`/policies/${p.id}/reject`, { method: "POST" }); pPolicy(); });
     wireBuilder(p, sch, save);
+    $("#draft").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
 function ruleBuilder(p, sch) {
